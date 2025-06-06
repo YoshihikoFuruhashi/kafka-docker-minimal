@@ -17,6 +17,7 @@ Python（confluent-kafka）でのProducer/Consumer例も付属。
 ├── .gitignore
 └── README.md
 
+```
 
 ## Makefileで簡単操作
 
