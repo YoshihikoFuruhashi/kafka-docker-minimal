@@ -7,23 +7,83 @@ on:
   pull_request:
 
 jobs:
-  noop:
+  test-makefile-targets:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Do nothing
-        run: echo "This is a placeholder for future CI steps."
-name: CI
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-jobs:
-  noop:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Do nothing
-        run: echo "This is a placeholder for future CI steps."
+      - name: Start Kafka and ZooKeeper
+        run: make up
+
+      - name: Wait for services to initialize
+        run: |
+          echo "Waiting for containers to start..."
+          sleep 10
+          docker ps
+
+      - name: Wait for ZooKeeper to be ready
+        run: |
+          echo "Waiting for ZooKeeper to be ready..."
+          for i in {1..30}; do
+            if docker exec zookeeper sh -c 'echo "ruok" | nc localhost 2181' | grep -q imok; then
+              echo "ZooKeeper is ready!"
+              break
+            fi
+            echo "Waiting for ZooKeeper... (attempt $i/30)"
+            sleep 2
+          done
+
+      - name: Wait for Kafka to be ready
+        run: |
+          echo "Waiting for Kafka to be ready..."
+          for i in {1..60}; do
+            if docker exec kafka kafka-topics --list --bootstrap-server localhost:9092 >/dev/null 2>&1; then
+              echo "Kafka is ready!"
+              break
+            fi
+            echo "Waiting... (attempt $i/60)"
+            sleep 3
+          done
+          # Verify Kafka is actually ready
+          echo "Final verification:"
+          docker exec kafka kafka-topics --list --bootstrap-server localhost:9092
+
+      - name: Create topic
+        run: |
+          echo "Creating topic..."
+          make create-topic
+          echo "Verifying topic was created:"
+          docker exec kafka kafka-topics --list --bootstrap-server localhost:9092
+
+      - name: Install Python dependencies
+        run: make install
+
+      - name: Verify Python dependencies
+        run: pip list | grep confluent-kafka
+
+      - name: Run producer (should complete in one execution)
+        run: |
+          echo "Running producer..."
+          make producer
+          echo "Producer completed successfully!"
+
+      - name: Run consumer (should auto-terminate after receiving messages or 10s timeout)
+        run: |
+          echo "Running consumer..."
+          make consumer
+          echo "Consumer completed successfully!"
+
+      - name: Stop Kafka and ZooKeeper
+        run: make down
+        if: always()
+
+      - name: Verify all targets completed successfully
+        run: echo "All Makefile PHONY targets executed successfully!"
 

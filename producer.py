@@ -1,26 +1,35 @@
-from confluent_kafka import Consumer
+from confluent_kafka import Producer
+import time
 
-c = Consumer({
-    'bootstrap.servers': 'localhost:9092',
-    'group.id': 'demo-group',
-    'auto.offset.reset': 'earliest'
+p = Producer({
+    'bootstrap.servers': 'localhost:9092'
 })
 
-c.subscribe(['demo-topic'])
+def delivery_report(err, msg):
+    if err is not None:
+        print(f'Message delivery failed: {err}')
+    else:
+        print(f'Message delivered to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}')
 
-print("Waiting for messages...")
+# Send a few sample messages
+messages = [
+    'Hello Kafka!',
+    'This is message #2',
+    'Final test message'
+]
 
-try:
-    while True:
-        msg = c.poll(1.0)
-        if msg is None:
-            continue
-        if msg.error():
-            print("Error: %s" % msg.error())
-            continue
-        print(f"Received: {msg.value().decode()} | Partition: {msg.partition()} | Offset: {msg.offset()}")
-except KeyboardInterrupt:
-    pass
-finally:
-    c.close()
+print("Sending messages...")
+
+for i, message in enumerate(messages):
+    try:
+        p.produce('demo-topic', value=message, callback=delivery_report)
+        print(f"Sent message {i+1}: {message}")
+    except Exception as e:
+        print(f"Failed to send message: {e}")
+
+# Wait for any outstanding messages to be delivered and delivery reports received
+p.flush()
+print("All messages sent successfully!")
+
+time.sleep(1)  # Brief pause to ensure messages are processed
 
