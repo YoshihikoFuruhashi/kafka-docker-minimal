@@ -4,26 +4,54 @@ on:
   push:
     branches:
       - main
+      - master
   pull_request:
 
 jobs:
-  noop:
+  test-makefile-targets:
     runs-on: ubuntu-latest
     steps:
-      - name: Do nothing
-        run: echo "This is a placeholder for future CI steps."
-name: CI
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-jobs:
-  noop:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Do nothing
-        run: echo "This is a placeholder for future CI steps."
+      - name: Start Kafka and ZooKeeper
+        run: make up
+
+      - name: Wait for Kafka to be ready
+        run: |
+          echo "Waiting for Kafka to be ready..."
+          for i in {1..60}; do
+            if docker exec kafka kafka-topics --list --bootstrap-server localhost:9092 >/dev/null 2>&1; then
+              echo "Kafka is ready!"
+              break
+            fi
+            echo "Waiting... (attempt $i/60)"
+            sleep 3
+          done
+          # Verify Kafka is actually ready
+          docker exec kafka kafka-topics --list --bootstrap-server localhost:9092
+
+      - name: Create topic
+        run: make create-topic
+
+      - name: Install Python dependencies
+        run: make install
+
+      - name: Run producer (should complete in one execution)
+        run: make producer
+
+      - name: Run consumer (should auto-terminate after receiving messages or 10s timeout)
+        run: make consumer
+
+      - name: Stop Kafka and ZooKeeper
+        run: make down
+        if: always()
+
+      - name: Verify all targets completed successfully
+        run: echo "All Makefile PHONY targets executed successfully!"
 

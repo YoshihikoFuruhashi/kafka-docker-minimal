@@ -6,7 +6,7 @@ up:
 
 # 2. トピック作成（パーティション3）
 create-topic:
-	docker exec -it kafka kafka-topics --create --topic demo-topic --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1 || true
+	docker exec kafka kafka-topics --create --topic demo-topic --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1 || true
 
 # 3. Python依存インストール
 install:
