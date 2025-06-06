@@ -32,7 +32,8 @@ jobs:
         run: |
           echo "Waiting for ZooKeeper to be ready..."
           for i in {1..30}; do
-            if docker exec zookeeper sh -c 'echo "ruok" | nc localhost 2181' | grep -q imok; then
+            # Use netcat to check if ZooKeeper port is accessible instead of 'ruok' command
+            if docker exec zookeeper sh -c 'nc -z localhost 2181' >/dev/null 2>&1; then
               echo "ZooKeeper is ready!"
               break
             fi
